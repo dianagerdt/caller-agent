@@ -148,13 +148,14 @@ export class SessionStore {
   }
 
   private emit(sessionId: string, event: ServerEvent): void {
-    const sessionListeners = this.listeners.get(sessionId);
-    if (!sessionListeners) {
-      return;
-    }
+    const sessionListeners = [...(this.listeners.get(sessionId) ?? [])];
 
     for (const listener of sessionListeners) {
-      listener(this.cloneEvent(event));
+      try {
+        listener(this.cloneEvent(event));
+      } catch {
+        // Listener failures must not block delivery to other subscribers.
+      }
     }
   }
 
