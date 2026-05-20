@@ -40,7 +40,8 @@ describe('loadConfig', () => {
       'wss:gateway',
       'ws:///gateway',
       'wss:///gateway',
-      'ws:////gateway'
+      'ws:////gateway',
+      'ws://gateway#frag'
     ];
 
     for (const gatewayUrl of invalidUrls) {

@@ -44,6 +44,10 @@ function parseGatewayUrl(value: string): string {
     throw new Error('GIGACALLER_GATEWAY_WS_URL must be a ws:// or wss:// URL');
   }
 
+  if (url.hash) {
+    throw new Error('GIGACALLER_GATEWAY_WS_URL must be a ws:// or wss:// URL');
+  }
+
   return value.replace(/\/$/, '');
 }
 
