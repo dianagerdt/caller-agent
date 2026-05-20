@@ -17,4 +17,45 @@ describe('loadConfig', () => {
   it('rejects missing gateway URL', () => {
     expect(() => loadConfig({})).toThrow('GIGACALLER_GATEWAY_WS_URL is required');
   });
+
+  it('rejects invalid port values', () => {
+    const invalidPorts = ['0', '65536', '3.14', 'not-a-number', 'Infinity'];
+
+    for (const port of invalidPorts) {
+      expect(() =>
+        loadConfig({
+          GIGACALLER_GATEWAY_WS_URL: 'ws://gateway:8080',
+          PORT: port
+        })
+      ).toThrow('PORT must be an integer from 1 to 65535');
+    }
+  });
+
+  it('rejects gateway URLs without ws or wss protocol', () => {
+    const invalidUrls = ['http://gateway', 'not a url'];
+
+    for (const gatewayUrl of invalidUrls) {
+      expect(() =>
+        loadConfig({
+          GIGACALLER_GATEWAY_WS_URL: gatewayUrl
+        })
+      ).toThrow('GIGACALLER_GATEWAY_WS_URL must be a ws:// or wss:// URL');
+    }
+  });
+
+  it('uses GigaChat defaults for blank optional values', () => {
+    const config = loadConfig({
+      GIGACALLER_GATEWAY_WS_URL: 'wss://gateway:8080/',
+      GIGACHAT_SCOPE: '   ',
+      GIGACHAT_AUTH_URL: '',
+      GIGACHAT_API_BASE_URL: '  ',
+      GIGACHAT_MODEL: ''
+    });
+
+    expect(config.gigacallerGatewayWsUrl).toBe('wss://gateway:8080');
+    expect(config.gigachat.scope).toBe('GIGACHAT_API_PERS');
+    expect(config.gigachat.authUrl).toBe('https://ngw.devices.sberbank.ru:9443/api/v2/oauth');
+    expect(config.gigachat.apiBaseUrl).toBe('https://gigachat.devices.sberbank.ru/api/v1');
+    expect(config.gigachat.model).toBe('GigaChat');
+  });
 });
