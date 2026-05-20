@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeGatewayTextMessage } from '../../src/server/gigacaller/gatewayClient';
+import { describe, expect, it, vi } from 'vitest';
+import WebSocket from 'ws';
+import { GatewayClient, normalizeGatewayTextMessage } from '../../src/server/gigacaller/gatewayClient';
 
 describe('normalizeGatewayTextMessage', () => {
   it('normalizes ready messages', () => {
@@ -53,5 +54,29 @@ describe('normalizeGatewayTextMessage', () => {
 
   it('throws on invalid JSON', () => {
     expect(() => normalizeGatewayTextMessage('{bad')).toThrow('Invalid gateway JSON');
+  });
+});
+
+describe('GatewayClient', () => {
+  it('sends interrupt payload with fixed calledAt timestamp', () => {
+    const send = vi.fn();
+    const client = new GatewayClient({
+      baseUrl: 'ws://gateway.local',
+      onMessage: vi.fn(),
+      onBinary: vi.fn(),
+      onClose: vi.fn(),
+      onError: vi.fn()
+    });
+
+    Object.assign(client as unknown as { socket: { readyState: number; send: (data: string) => void } }, {
+      socket: { readyState: WebSocket.OPEN, send }
+    });
+
+    client.interrupt(1234567890);
+
+    expect(send).toHaveBeenCalledWith(JSON.stringify({
+      type: 'interrupt',
+      data: { calledAt: 1234567890 }
+    }));
   });
 });

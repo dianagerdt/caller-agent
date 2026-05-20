@@ -61,8 +61,8 @@ export class GatewayClient {
     this.sendJson({ type: 'initialRequest', data: payload });
   }
 
-  interrupt(): void {
-    this.sendJson({ type: 'interrupt' });
+  interrupt(calledAt = Date.now()): void {
+    this.sendJson({ type: 'interrupt', data: { calledAt } });
   }
 
   close(): void {
