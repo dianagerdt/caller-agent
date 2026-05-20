@@ -5,7 +5,13 @@ export type GatewayTranscriptSource = 'user' | 'model' | 'unknown';
 
 export type NormalizedGatewayMessage =
   | { type: 'ready'; requestId: string | undefined }
-  | { type: 'status'; status: string | undefined; callId: string | undefined }
+  | {
+      type: 'status';
+      status: string | undefined;
+      requestId: string | undefined;
+      callId: string | undefined;
+      data: unknown;
+    }
   | {
       type: 'transcription';
       source: GatewayTranscriptSource;
@@ -13,8 +19,8 @@ export type NormalizedGatewayMessage =
       seqNum: number | undefined;
       callId: string | undefined;
     }
-  | { type: 'functionCall'; name: string | undefined; arguments: unknown; callId: string | undefined }
-  | { type: 'error'; message: string; code: string | undefined }
+  | { type: 'functionCall'; data: unknown }
+  | { type: 'error'; message: string; data: unknown }
   | { type: 'unknown'; rawType: string | undefined; data: unknown };
 
 export interface GatewayClientOptions {
@@ -96,7 +102,13 @@ export function normalizeGatewayTextMessage(text: string): NormalizedGatewayMess
     case 'ready':
       return { type: 'ready', requestId: asString(data.requestId) };
     case 'status':
-      return { type: 'status', status: asString(data.status), callId: asString(data.callId) };
+      return {
+        type: 'status',
+        status: asString(data.status),
+        requestId: asString(data.requestId),
+        callId: asString(data.callId),
+        data: parsed.data
+      };
     case 'transcription':
       return {
         type: 'transcription',
@@ -106,14 +118,9 @@ export function normalizeGatewayTextMessage(text: string): NormalizedGatewayMess
         callId: asString(data.callId)
       };
     case 'functionCall':
-      return {
-        type: 'functionCall',
-        name: asString(data.name),
-        arguments: data.arguments,
-        callId: asString(data.callId)
-      };
+      return { type: 'functionCall', data: parsed.data };
     case 'error':
-      return { type: 'error', message: asString(data.message) ?? '', code: asString(data.code) };
+      return { type: 'error', message: asString(data.message) ?? 'Gateway error', data: parsed.data };
     default:
       return { type: 'unknown', rawType: asString(parsed.type), data: parsed.data };
   }

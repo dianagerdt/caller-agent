@@ -27,22 +27,38 @@ describe('normalizeGatewayTextMessage', () => {
   it('normalizes status messages', () => {
     expect(normalizeGatewayTextMessage(JSON.stringify({
       type: 'status',
-      data: { status: 'connected', callId: 'call-1' }
-    }))).toEqual({ type: 'status', status: 'connected', callId: 'call-1' });
+      data: { status: 'connected', requestId: 'req-1', callId: 'call-1', retry: 2 }
+    }))).toEqual({
+      type: 'status',
+      status: 'connected',
+      requestId: 'req-1',
+      callId: 'call-1',
+      data: { status: 'connected', requestId: 'req-1', callId: 'call-1', retry: 2 }
+    });
   });
 
-  it('normalizes function call messages', () => {
+  it('preserves raw function call data', () => {
     expect(normalizeGatewayTextMessage(JSON.stringify({
       type: 'functionCall',
       data: { name: 'selectQuest', arguments: { id: 'quest-1' }, callId: 'call-1' }
-    }))).toEqual({ type: 'functionCall', name: 'selectQuest', arguments: { id: 'quest-1' }, callId: 'call-1' });
+    }))).toEqual({
+      type: 'functionCall',
+      data: { name: 'selectQuest', arguments: { id: 'quest-1' }, callId: 'call-1' }
+    });
   });
 
   it('normalizes error messages', () => {
     expect(normalizeGatewayTextMessage(JSON.stringify({
       type: 'error',
       data: { message: 'Gateway failed', code: 'BAD_REQUEST' }
-    }))).toEqual({ type: 'error', message: 'Gateway failed', code: 'BAD_REQUEST' });
+    }))).toEqual({ type: 'error', message: 'Gateway failed', data: { message: 'Gateway failed', code: 'BAD_REQUEST' } });
+  });
+
+  it('defaults gateway error message and retains data', () => {
+    expect(normalizeGatewayTextMessage(JSON.stringify({
+      type: 'error',
+      data: { code: 'UPSTREAM_ERROR' }
+    }))).toEqual({ type: 'error', message: 'Gateway error', data: { code: 'UPSTREAM_ERROR' } });
   });
 
   it('normalizes unknown message types', () => {
