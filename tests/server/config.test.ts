@@ -32,7 +32,16 @@ describe('loadConfig', () => {
   });
 
   it('rejects gateway URLs without ws or wss protocol', () => {
-    const invalidUrls = ['http://gateway', 'not a url', 'ws:gateway', 'ws:/gateway', 'wss:gateway'];
+    const invalidUrls = [
+      'http://gateway',
+      'not a url',
+      'ws:gateway',
+      'ws:/gateway',
+      'wss:gateway',
+      'ws:///gateway',
+      'wss:///gateway',
+      'ws:////gateway'
+    ];
 
     for (const gatewayUrl of invalidUrls) {
       expect(() =>

@@ -29,7 +29,7 @@ function parsePort(value: string | undefined): number {
 }
 
 function parseGatewayUrl(value: string): string {
-  if (!value.startsWith('ws://') && !value.startsWith('wss://')) {
+  if (!/^wss?:\/\/[^/\s]+/.test(value)) {
     throw new Error('GIGACALLER_GATEWAY_WS_URL must be a ws:// or wss:// URL');
   }
 
