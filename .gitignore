@@ -5,3 +5,4 @@ node_modules/
 dist/
 coverage/
 .superpowers/
+docs/superpowers/specs/2026-05-20-gigacaller-agent-design.md
