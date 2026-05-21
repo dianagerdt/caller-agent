@@ -15,6 +15,14 @@ interface QuestResponse {
 
 type RequestState = 'idle' | 'loading' | 'calling' | 'error';
 
+const terminalStatuses = new Set<CallSessionSnapshot['status']>([
+  'completed',
+  'noAnswer',
+  'failed',
+  'closed',
+  'interrupted'
+]);
+
 const statusLabels: Record<CallSessionSnapshot['status'], string> = {
   idle: 'Ожидание',
   connecting: 'Соединяем',
@@ -41,6 +49,8 @@ export function App() {
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [message, setMessage] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
+  const activeStartRequestRef = useRef(0);
+  const currentSessionIdRef = useRef<string | null>(null);
 
   const selectedQuest = useMemo(
     () => quests.find((quest) => quest.id === questId),
@@ -78,18 +88,29 @@ export function App() {
 
     return () => {
       active = false;
+      activeStartRequestRef.current += 1;
+      currentSessionIdRef.current = null;
       eventSourceRef.current?.close();
+      eventSourceRef.current = null;
     };
   }, []);
 
   async function startCall(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (requestState === 'calling') {
+      return;
+    }
+
+    const startRequestId = activeStartRequestRef.current + 1;
+    activeStartRequestRef.current = startRequestId;
+    currentSessionIdRef.current = null;
     setRequestState('calling');
     setMessage('');
     setTranscript([]);
     setResultCard(null);
     setSession(null);
     eventSourceRef.current?.close();
+    eventSourceRef.current = null;
 
     try {
       const payload = {
@@ -107,31 +128,61 @@ export function App() {
       if (!response.ok) {
         throw new Error('message' in data && data.message ? data.message : `Call request failed: ${response.status}`);
       }
+      if (activeStartRequestRef.current !== startRequestId) {
+        return;
+      }
 
       const nextSession = data as CallSessionSnapshot;
+      currentSessionIdRef.current = nextSession.sessionId;
       setSession(nextSession);
       setTranscript(nextSession.transcript);
       setResultCard(nextSession.resultCard ?? null);
       setRequestState('idle');
-      openCallEvents(nextSession.sessionId);
+      openCallEvents(nextSession.sessionId, startRequestId);
     } catch (error) {
+      if (activeStartRequestRef.current !== startRequestId) {
+        return;
+      }
       setRequestState('error');
       setMessage(error instanceof Error ? error.message : 'Не удалось запустить звонок');
     }
   }
 
-  function openCallEvents(sessionId: string) {
+  function openCallEvents(sessionId: string, startRequestId: number) {
+    eventSourceRef.current?.close();
     const events = new EventSource(`/api/calls/${sessionId}/events`);
     eventSourceRef.current = events;
 
+    function isCurrentStream() {
+      return activeStartRequestRef.current === startRequestId && currentSessionIdRef.current === sessionId;
+    }
+
+    function closeCurrentStream() {
+      if (eventSourceRef.current === events) {
+        events.close();
+        eventSourceRef.current = null;
+      }
+    }
+
     events.addEventListener('status', (event) => {
+      if (!isCurrentStream()) {
+        events.close();
+        return;
+      }
       const payload = JSON.parse(event.data) as Extract<ServerEvent, { type: 'status' }>;
       setSession(payload.session);
       setTranscript(payload.session.transcript);
       setResultCard(payload.session.resultCard ?? null);
+      if (terminalStatuses.has(payload.session.status)) {
+        closeCurrentStream();
+      }
     });
 
     events.addEventListener('transcription', (event) => {
+      if (!isCurrentStream()) {
+        events.close();
+        return;
+      }
       const payload = JSON.parse(event.data) as Extract<ServerEvent, { type: 'transcription' }>;
       setTranscript((current) => {
         if (current.some((item) => item.id === payload.item.id)) {
@@ -142,11 +193,19 @@ export function App() {
     });
 
     events.addEventListener('resultCard', (event) => {
+      if (!isCurrentStream()) {
+        events.close();
+        return;
+      }
       const payload = JSON.parse(event.data) as Extract<ServerEvent, { type: 'resultCard' }>;
       setResultCard(payload.card);
     });
 
     events.addEventListener('error', (event) => {
+      if (!isCurrentStream()) {
+        events.close();
+        return;
+      }
       try {
         const payload = JSON.parse((event as MessageEvent).data) as Extract<ServerEvent, { type: 'error' }>;
         setMessage(payload.message);
@@ -154,11 +213,17 @@ export function App() {
         setMessage('Поток событий прерван');
       }
       setRequestState('error');
+      closeCurrentStream();
     });
 
     events.onerror = () => {
+      if (!isCurrentStream()) {
+        events.close();
+        return;
+      }
       setMessage('Поток событий недоступен');
       setRequestState('error');
+      closeCurrentStream();
     };
   }
 

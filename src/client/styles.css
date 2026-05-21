@@ -51,6 +51,14 @@ button:disabled {
   opacity: 0.55;
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 4px solid #6f35ff;
+  outline-offset: 4px;
+}
+
 input,
 select,
 textarea {
