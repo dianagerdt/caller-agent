@@ -73,5 +73,12 @@ describe('generateResultCard', () => {
         nested: '{"skip":true}'
       }
     });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      model: 'GigaChat',
+      messages: expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: expect.stringContaining('Проверил логи') })
+      ]),
+      temperature: 0.4
+    });
   });
 });

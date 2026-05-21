@@ -36,7 +36,8 @@ export class GigaChatClient {
       },
       body: JSON.stringify({
         model: this.config.model,
-        messages: [{ role: 'user', content: prompt }]
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.4
       })
     });
 
