@@ -154,7 +154,11 @@ export function App() {
     eventSourceRef.current = events;
 
     function isCurrentStream() {
-      return activeStartRequestRef.current === startRequestId && currentSessionIdRef.current === sessionId;
+      return (
+        eventSourceRef.current === events &&
+        activeStartRequestRef.current === startRequestId &&
+        currentSessionIdRef.current === sessionId
+      );
     }
 
     function closeCurrentStream() {
@@ -173,7 +177,7 @@ export function App() {
       setSession(payload.session);
       setTranscript(payload.session.transcript);
       setResultCard(payload.session.resultCard ?? null);
-      if (terminalStatuses.has(payload.session.status)) {
+      if (payload.session.status === 'closed' || (terminalStatuses.has(payload.session.status) && payload.session.resultCard)) {
         closeCurrentStream();
       }
     });
@@ -199,6 +203,7 @@ export function App() {
       }
       const payload = JSON.parse(event.data) as Extract<ServerEvent, { type: 'resultCard' }>;
       setResultCard(payload.card);
+      closeCurrentStream();
     });
 
     events.addEventListener('error', (event) => {

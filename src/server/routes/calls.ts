@@ -4,6 +4,7 @@ import type { AppConfig } from '../config';
 import { GatewayClient, type GatewayClientOptions } from '../gigacaller/gatewayClient';
 import { buildSystemPrompt } from '../prompts/promptBuilder';
 import { isAllowedVoice } from '../prompts/quests';
+import { generateResultCard } from '../result-cards/generator';
 import type { SessionStore } from '../sessions/sessionStore';
 import type { CallStatus } from '../../shared/types';
 
@@ -23,7 +24,8 @@ const startCallSchema = z.object({
   customPrompt: z.string().optional().nullable()
 });
 
-const terminalStatuses = new Set<CallStatus>(['completed', 'noAnswer', 'failed']);
+const terminalStatuses = new Set<CallStatus>(['completed', 'noAnswer', 'failed', 'interrupted']);
+const finishingSessions = new Map<string, Promise<void>>();
 
 export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = async (app, deps) => {
   const gateways = new Map<string, GatewayConnection>();
@@ -68,7 +70,15 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
         });
 
         const snapshot = deps.sessions.get(session.sessionId);
-        if (snapshot && !terminalStatuses.has(snapshot.status)) {
+        if (!snapshot) {
+          return;
+        }
+        if (terminalStatuses.has(snapshot.status)) {
+          void safeFinishSession(session.sessionId, deps);
+          return;
+        }
+
+        if (snapshot.status !== 'closed') {
           deps.sessions.setStatus(session.sessionId, 'closed');
         }
       },
@@ -99,7 +109,12 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
             if (message.callId) {
               deps.sessions.setCallId(session.sessionId, message.callId);
             }
-            deps.sessions.setStatus(session.sessionId, normalizeStatus(message.status));
+            const status = normalizeStatus(message.status);
+            deps.sessions.setStatus(session.sessionId, status);
+            if (terminalStatuses.has(status)) {
+              closeGateway(gateways, session.sessionId);
+              void safeFinishSession(session.sessionId, deps);
+            }
             break;
           case 'transcription':
             if (message.callId) {
@@ -125,6 +140,8 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
               details: message.data
             });
             deps.sessions.setStatus(session.sessionId, 'failed');
+            closeGateway(gateways, session.sessionId);
+            void safeFinishSession(session.sessionId, deps);
             break;
           case 'unknown':
             deps.sessions.addTechnicalEvent(session.sessionId, {
@@ -155,6 +172,7 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
 
   app.get('/api/calls/:sessionId/events', async (request, reply) => {
     const { sessionId } = request.params as { sessionId: string };
+    const { once } = request.query as { once?: string };
     if (!deps.sessions.get(sessionId)) {
       return reply.code(404).send({ message: 'Session not found' });
     }
@@ -168,6 +186,10 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
     const unsubscribe = deps.sessions.subscribe(sessionId, (event) => {
       reply.raw.write(`event: ${event.type}\n`);
       reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+      if (once === event.type) {
+        unsubscribe();
+        reply.raw.end();
+      }
     });
 
     request.raw.on('close', unsubscribe);
@@ -183,10 +205,22 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
 
     gateway.interrupt();
     deps.sessions.setStatus(sessionId, 'interrupted');
+    closeGateway(gateways, sessionId);
+    void safeFinishSession(sessionId, deps);
 
     return { ok: true };
   });
 };
+
+function closeGateway(gateways: Map<string, GatewayConnection>, sessionId: string): void {
+  const gateway = gateways.get(sessionId);
+  if (!gateway) {
+    return;
+  }
+
+  gateways.delete(sessionId);
+  gateway.close();
+}
 
 function cleanPhoneNumber(phoneNumber: string): string {
   return phoneNumber.replace(/\D/g, '');
@@ -197,9 +231,59 @@ function isValidPhoneNumber(phoneNumber: string): boolean {
 }
 
 function normalizeStatus(status: string | undefined): CallStatus {
-  if (status === 'ringing' || status === 'answered' || status === 'completed' || status === 'noAnswer' || status === 'failed') {
+  if (
+    status === 'ringing' ||
+    status === 'answered' ||
+    status === 'completed' ||
+    status === 'noAnswer' ||
+    status === 'failed' ||
+    status === 'interrupted'
+  ) {
     return status;
   }
 
   return 'published';
+}
+
+async function finishSession(sessionId: string, deps: { sessions: SessionStore; config: AppConfig }) {
+  const existing = finishingSessions.get(sessionId);
+  if (existing) {
+    return existing;
+  }
+
+  const finishing = (async () => {
+    const snapshot = deps.sessions.get(sessionId);
+    if (!snapshot || snapshot.resultCard) {
+      return;
+    }
+
+    const card = await generateResultCard({
+      questId: snapshot.questId,
+      transcript: snapshot.transcript,
+      gigachat: deps.config.gigachat
+    });
+    const latest = deps.sessions.get(sessionId);
+    if (!latest || latest.resultCard) {
+      return;
+    }
+
+    deps.sessions.setResultCard(sessionId, card);
+  })().finally(() => {
+    finishingSessions.delete(sessionId);
+  });
+
+  finishingSessions.set(sessionId, finishing);
+  return finishing;
+}
+
+async function safeFinishSession(sessionId: string, deps: { sessions: SessionStore; config: AppConfig }) {
+  try {
+    await finishSession(sessionId, deps);
+  } catch (error) {
+    deps.sessions.addTechnicalEvent(sessionId, {
+      level: 'error',
+      message: 'Result card generation failed',
+      details: error instanceof Error ? { message: error.message } : error
+    });
+  }
 }

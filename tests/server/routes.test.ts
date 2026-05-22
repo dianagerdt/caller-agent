@@ -1,10 +1,40 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../../src/server/app';
 import { loadConfig } from '../../src/server/config';
+import type { GatewayClientOptions } from '../../src/server/gigacaller/gatewayClient';
+
+function createFakeGatewayFactory() {
+  let options: GatewayClientOptions | undefined;
+  const gateway = {
+    connect: vi.fn(),
+    sendInitialRequest: vi.fn(),
+    interrupt: vi.fn(),
+    close: vi.fn()
+  };
+
+  return {
+    gateway,
+    get options() {
+      if (!options) {
+        throw new Error('Gateway was not created');
+      }
+
+      return options;
+    },
+    factory: vi.fn((nextOptions: GatewayClientOptions) => {
+      options = nextOptions;
+      return gateway;
+    })
+  };
+}
 
 describe('server routes', () => {
   const config = loadConfig({
     GIGACALLER_GATEWAY_WS_URL: 'ws://localhost:9999'
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('returns quest definitions and supported voices', async () => {
@@ -42,5 +72,213 @@ describe('server routes', () => {
     expect(response.json()).toMatchObject({
       message: expect.stringContaining('Unsupported voice')
     });
+  });
+
+  it('creates session snapshots for valid requests', async () => {
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '+79990000000',
+        questId: 'custom',
+        voice: 'Bik-Freespeech_8000',
+        customPrompt: 'Проведи короткий демо-разговор'
+      }
+    });
+
+    await app.close();
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json().questId).toBe('custom');
+    expect(fakeGateway.gateway.connect).toHaveBeenCalledOnce();
+  });
+
+  it('creates fallback result card when gateway reports terminal status', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '+79990000000',
+        questId: 'custom',
+        voice: 'Bik-Freespeech_8000',
+        customPrompt: 'Проведи короткий демо-разговор'
+      }
+    });
+    const { sessionId } = createResponse.json();
+
+    fakeGateway.options.onMessage({
+      type: 'transcription',
+      source: 'user',
+      text: 'Привет, это тестовый разговор',
+      seqNum: 1,
+      callId: 'call-1'
+    });
+    fakeGateway.options.onMessage({
+      type: 'status',
+      status: 'completed',
+      requestId: 'request-1',
+      callId: 'call-1',
+      data: {}
+    });
+
+    await vi.waitFor(async () => {
+      const sessionResponse = await app.inject({
+        method: 'GET',
+        url: `/api/calls/${sessionId}`
+      });
+
+      expect(sessionResponse.json().resultCard).toMatchObject({
+        questId: 'custom',
+        source: 'fallback',
+        title: 'Свободный Промпт'
+      });
+    });
+
+    await app.close();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('streams result card events after terminal gateway status', async () => {
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '+79990000000',
+        questId: 'custom',
+        voice: 'Bik-Freespeech_8000',
+        customPrompt: 'Проведи короткий демо-разговор'
+      }
+    });
+    const { sessionId } = createResponse.json();
+    const eventResponsePromise = app.inject({
+      method: 'GET',
+      url: `/api/calls/${sessionId}/events?once=resultCard`
+    });
+
+    await new Promise((resolve) => {
+      setImmediate(resolve);
+    });
+
+    fakeGateway.options.onMessage({
+      type: 'transcription',
+      source: 'user',
+      text: 'Привет, это тестовый разговор',
+      seqNum: 1,
+      callId: 'call-1'
+    });
+    fakeGateway.options.onMessage({
+      type: 'status',
+      status: 'completed',
+      requestId: 'request-1',
+      callId: 'call-1',
+      data: {}
+    });
+
+    const eventResponse = await eventResponsePromise;
+    await app.close();
+
+    expect(eventResponse.statusCode).toBe(200);
+    const eventText = eventResponse.body;
+    expect(eventText).toContain('event: resultCard');
+    expect(eventText).toContain('"type":"resultCard"');
+    expect(eventText).toContain('"source":"fallback"');
+  });
+
+  it('does not create a result card when gateway closes before terminal call status', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '+79990000000',
+        questId: 'custom',
+        voice: 'Bik-Freespeech_8000',
+        customPrompt: 'Проведи короткий демо-разговор'
+      }
+    });
+    const { sessionId } = createResponse.json();
+
+    fakeGateway.options.onMessage({
+      type: 'ready',
+      requestId: 'request-1'
+    });
+    fakeGateway.options.onClose(1006, Buffer.from('network lost'));
+
+    const sessionResponse = await app.inject({
+      method: 'GET',
+      url: `/api/calls/${sessionId}`
+    });
+
+    await app.close();
+
+    expect(sessionResponse.json()).toMatchObject({
+      status: 'closed'
+    });
+    expect(sessionResponse.json().resultCard).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('treats gateway interrupted status as terminal', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '+79990000000',
+        questId: 'custom',
+        voice: 'Bik-Freespeech_8000',
+        customPrompt: 'Проведи короткий демо-разговор'
+      }
+    });
+    const { sessionId } = createResponse.json();
+
+    fakeGateway.options.onMessage({
+      type: 'status',
+      status: 'interrupted',
+      requestId: 'request-1',
+      callId: 'call-1',
+      data: {}
+    });
+
+    await vi.waitFor(async () => {
+      const sessionResponse = await app.inject({
+        method: 'GET',
+        url: `/api/calls/${sessionId}`
+      });
+      const session = sessionResponse.json();
+
+      expect(session.status).toBe('interrupted');
+      expect(session.resultCard).toMatchObject({
+        questId: 'custom',
+        source: 'fallback'
+      });
+    });
+
+    const interruptResponse = await app.inject({
+      method: 'POST',
+      url: `/api/calls/${sessionId}/interrupt`
+    });
+
+    await app.close();
+
+    expect(fakeGateway.gateway.close).toHaveBeenCalledOnce();
+    expect(interruptResponse.statusCode).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
