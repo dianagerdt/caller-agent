@@ -49,6 +49,7 @@ export function App() {
   const [requestState, setRequestState] = useState<RequestState>('loading');
   const [message, setMessage] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
+  const transcriptWindowRef = useRef<HTMLDivElement | null>(null);
   const activeStartRequestRef = useRef(0);
   const currentSessionIdRef = useRef<string | null>(null);
 
@@ -94,6 +95,18 @@ export function App() {
       eventSourceRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const transcriptWindow = transcriptWindowRef.current;
+    if (!transcriptWindow) {
+      return;
+    }
+
+    transcriptWindow.scrollTo({
+      top: transcriptWindow.scrollHeight,
+      behavior: transcript.length > 1 ? 'smooth' : 'auto'
+    });
+  }, [transcript.length]);
 
   async function startCall(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -344,7 +357,7 @@ export function App() {
             <span>02</span>
             <h2>Live Transcript</h2>
           </div>
-          <div className="terminal-window">
+          <div className="terminal-window" ref={transcriptWindowRef}>
             {transcript.length === 0 ? (
               <p className="empty-state">Здесь появятся реплики участника и агента.</p>
             ) : (
