@@ -8,6 +8,7 @@ export interface GenerateResultCardInput {
   questId: QuestId;
   transcript: TranscriptItem[];
   gigachat: AppConfig['gigachat'];
+  onFallback?: (reason: string) => void;
 }
 
 interface GigaChatCardPayload {
@@ -24,7 +25,8 @@ export async function generateResultCard(input: GenerateResultCardInput): Promis
   try {
     const payload = await client.completeJson(buildCardPrompt(input.questId, input.transcript));
     return normalizeResultCard(input.questId, payload);
-  } catch {
+  } catch (error) {
+    input.onFallback?.(error instanceof Error ? error.message : String(error));
     return buildGeneratorFallbackCard(input.questId, input.transcript);
   }
 }

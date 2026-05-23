@@ -1,10 +1,12 @@
 import { randomUUID } from 'crypto';
+import { Agent, type Dispatcher } from 'undici';
 import type { AppConfig } from '../config';
 
 type GigaChatConfig = AppConfig['gigachat'];
 
 interface GigaChatTokenResponse {
   access_token?: unknown;
+  tok?: unknown;
 }
 
 interface GigaChatCompletionResponse {
@@ -16,7 +18,13 @@ interface GigaChatCompletionResponse {
 }
 
 export class GigaChatClient {
-  constructor(private readonly config: GigaChatConfig) {}
+  private readonly dispatcher: Dispatcher | undefined;
+
+  constructor(private readonly config: GigaChatConfig) {
+    this.dispatcher = config.tlsRejectUnauthorized ? undefined : new Agent({
+      connect: { rejectUnauthorized: false }
+    });
+  }
 
   isConfigured(): boolean {
     return Boolean(
@@ -38,6 +46,7 @@ export class GigaChatClient {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
+      ...(this.dispatcher ? { dispatcher: this.dispatcher } : {}),
       body: JSON.stringify({
         model: this.config.model,
         messages: [{ role: 'user', content: prompt }],
@@ -81,6 +90,7 @@ export class GigaChatClient {
         RqUID: randomUUID(),
         'Content-Type': 'application/x-www-form-urlencoded'
       },
+      ...(this.dispatcher ? { dispatcher: this.dispatcher } : {}),
       body: body.toString()
     });
 
@@ -89,11 +99,12 @@ export class GigaChatClient {
     }
 
     const payload = await response.json() as GigaChatTokenResponse;
-    if (typeof payload.access_token !== 'string' || !payload.access_token.trim()) {
+    const parsedAccessToken = typeof payload.access_token === 'string' ? payload.access_token : payload.tok;
+    if (typeof parsedAccessToken !== 'string' || !parsedAccessToken.trim()) {
       throw new Error('GigaChat auth response is missing access token');
     }
 
-    return payload.access_token;
+    return parsedAccessToken;
   }
 
   private getBasicCredentials(): string | undefined {

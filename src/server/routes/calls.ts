@@ -262,7 +262,14 @@ async function finishSession(sessionId: string, deps: { sessions: SessionStore; 
     const card = await generateResultCard({
       questId: snapshot.questId,
       transcript: snapshot.transcript,
-      gigachat: deps.config.gigachat
+      gigachat: deps.config.gigachat,
+      onFallback: (reason) => {
+        deps.sessions.addTechnicalEvent(sessionId, {
+          level: 'warning',
+          message: 'GigaChat result card fallback',
+          details: { reason }
+        });
+      }
     });
     const latest = deps.sessions.get(sessionId);
     if (!latest || latest.resultCard) {

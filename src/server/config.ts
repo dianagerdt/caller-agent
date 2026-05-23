@@ -12,6 +12,7 @@ export interface AppConfig {
     username?: string;
     password?: string;
     scope?: string;
+    tlsRejectUnauthorized: boolean;
     authUrl: string;
     apiBaseUrl: string;
     model: string;
@@ -93,6 +94,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       username: optionalTrimmedValue(env.GIGACHAT_USERNAME),
       password: optionalTrimmedValue(env.GIGACHAT_PASSWORD),
       scope: optionalTrimmedValue(env.GIGACHAT_SCOPE),
+      tlsRejectUnauthorized: parseBoolean(env.GIGACHAT_TLS_REJECT_UNAUTHORIZED, true),
       authUrl: optionalValue(env.GIGACHAT_AUTH_URL, 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'),
       apiBaseUrl: optionalValue(env.GIGACHAT_API_BASE_URL, 'https://gigachat.devices.sberbank.ru/api/v1'),
       model: optionalValue(env.GIGACHAT_MODEL, 'GigaChat')

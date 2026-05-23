@@ -46,6 +46,7 @@ GigaChat auth data is optional. Without it, the app uses local fallback result c
 - `GIGACHAT_USERNAME`: optional OAuth login/client id. Used with `GIGACHAT_PASSWORD` when `GIGACHAT_CREDENTIALS` is empty.
 - `GIGACHAT_PASSWORD`: optional OAuth password/client secret. Used with `GIGACHAT_USERNAME`.
 - `GIGACHAT_SCOPE`: optional OAuth scope. Leave blank if your GigaChat access does not require it.
+- `GIGACHAT_TLS_REJECT_UNAUTHORIZED`: set to `false` only for local demos against a GigaChat certificate that is not trusted by your Node.js installation. Prefer installing the corporate CA and leaving this `true`.
 - `GIGACHAT_AUTH_URL`: GigaChat OAuth URL.
 - `GIGACHAT_API_BASE_URL`: GigaChat REST API base URL.
 - `GIGACHAT_MODEL`: chat completion model, defaults to `GigaChat`.

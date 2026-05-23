@@ -4,7 +4,8 @@ import { generateResultCard } from '../../src/server/result-cards/generator';
 const baseGigachat = {
   authUrl: '',
   apiBaseUrl: '',
-  model: 'GigaChat'
+  model: 'GigaChat',
+  tlsRejectUnauthorized: true
 };
 
 describe('generateResultCard', () => {
@@ -112,7 +113,7 @@ describe('generateResultCard', () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ access_token: 'oauth-token' })
+        json: async () => ({ tok: 'oauth-token' })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -144,5 +145,46 @@ describe('generateResultCard', () => {
       Authorization: `Basic ${Buffer.from('client-id:client-secret', 'utf8').toString('base64')}`
     });
     expect(fetchMock.mock.calls[0][1].body).toBe('');
+  });
+
+  it('passes a custom TLS dispatcher to GigaChat when verification is disabled', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: '{"title":"Итог","fields":{"summary":"Готово"}}'
+          }
+        }]
+      })
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await generateResultCard({
+      questId: 'custom',
+      transcript: [{ id: '1', source: 'user', text: 'Проверяем TLS', timestamp: 1 }],
+      gigachat: {
+        ...baseGigachat,
+        accessToken: 'direct-token',
+        apiBaseUrl: 'https://api.local',
+        tlsRejectUnauthorized: false
+      }
+    });
+
+    expect(fetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+  });
+
+  it('reports fallback reasons to callers', async () => {
+    const fallbackReasons: string[] = [];
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('TLS failed')));
+
+    await generateResultCard({
+      questId: 'custom',
+      transcript: [{ id: '1', source: 'user', text: 'Проверяем ошибку', timestamp: 1 }],
+      gigachat: { ...baseGigachat, accessToken: 'direct-token', apiBaseUrl: 'https://api.local' },
+      onFallback: (reason) => fallbackReasons.push(reason)
+    });
+
+    expect(fallbackReasons).toEqual(['TLS failed']);
   });
 });
