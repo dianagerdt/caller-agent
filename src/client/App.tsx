@@ -57,6 +57,8 @@ export function App() {
     () => quests.find((quest) => quest.id === questId),
     [questId, quests]
   );
+  const isCallActive = Boolean(session && !terminalStatuses.has(session.status) && !resultCard);
+  const isStartDisabled = requestState === 'calling' || isCallActive || !voice;
 
   useEffect(() => {
     let active = true;
@@ -110,7 +112,7 @@ export function App() {
 
   async function startCall(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (requestState === 'calling') {
+    if (isStartDisabled) {
       return;
     }
 
@@ -269,8 +271,8 @@ export function App() {
     <main className="app-shell">
       <header className="top-bar">
         <div>
-          <p className="eyebrow">GigaCaller Agent</p>
-          <h1>Comic Terminal Dashboard</h1>
+          <p className="eyebrow">GigaCaller Агент</p>
+          <h1>Комикс-терминал</h1>
         </div>
         <div className={`status-pill status-${session?.status ?? 'idle'}`}>
           {statusLabels[session?.status ?? 'idle']}
@@ -343,8 +345,8 @@ export function App() {
           {message ? <p className="error-line">{message}</p> : null}
 
           <div className="button-row">
-            <button type="submit" disabled={requestState === 'calling' || !voice}>
-              {requestState === 'calling' ? 'Запускаем...' : 'Старт звонка'}
+            <button type="submit" disabled={isStartDisabled}>
+              {requestState === 'calling' ? 'Запускаем...' : isCallActive ? 'Звонок идет' : 'Старт звонка'}
             </button>
             <button type="button" className="secondary-button" onClick={interruptCall} disabled={!session}>
               Прервать
@@ -355,7 +357,7 @@ export function App() {
         <section className="panel transcript-panel" aria-label="Живая расшифровка">
           <div className="panel-title">
             <span>02</span>
-            <h2>Live Transcript</h2>
+            <h2>Живая расшифровка</h2>
           </div>
           <div className="terminal-window" ref={transcriptWindowRef}>
             {transcript.length === 0 ? (
@@ -374,7 +376,7 @@ export function App() {
         <aside className="panel result-panel" aria-label="Итоговая карточка">
           <div className="panel-title">
             <span>03</span>
-            <h2>Result Card</h2>
+            <h2>Итоговая карточка</h2>
           </div>
           {resultCard ? (
             <div className="result-card">
