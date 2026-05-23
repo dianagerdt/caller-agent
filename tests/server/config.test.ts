@@ -83,4 +83,13 @@ describe('loadConfig', () => {
     expect(config.gigachat.password).toBe('pass');
     expect(config.gigachat.scope).toBe('GIGACHAT_API_CORP');
   });
+
+  it('allows disabling GigaCaller Gateway TLS verification for local demos', () => {
+    const config = loadConfig({
+      GIGACALLER_GATEWAY_WS_URL: 'wss://gateway:443',
+      GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED: 'false'
+    });
+
+    expect(config.gigacallerGatewayTlsRejectUnauthorized).toBe(false);
+  });
 });

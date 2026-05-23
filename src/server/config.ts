@@ -3,6 +3,7 @@ import 'dotenv/config';
 export interface AppConfig {
   port: number;
   gigacallerGatewayWsUrl: string;
+  gigacallerGatewayTlsRejectUnauthorized: boolean;
   defaultRetry: string;
   defaultVoice: string;
   gigachat: {
@@ -57,6 +58,23 @@ function parseGatewayUrl(value: string): string {
   return value.replace(/\/$/, '');
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+    return true;
+  }
+
+  if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+    return false;
+  }
+
+  throw new Error('GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED must be true or false');
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const gatewayUrl = env.GIGACALLER_GATEWAY_WS_URL?.trim();
   if (!gatewayUrl) {
@@ -66,6 +84,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     port: parsePort(env.PORT),
     gigacallerGatewayWsUrl: parseGatewayUrl(gatewayUrl),
+    gigacallerGatewayTlsRejectUnauthorized: parseBoolean(env.GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED, true),
     defaultRetry: env.DEFAULT_RETRY ?? '0',
     defaultVoice: env.DEFAULT_VOICE ?? 'Bik-Freespeech_8000',
     gigachat: {

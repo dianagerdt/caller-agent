@@ -26,6 +26,7 @@ export type NormalizedGatewayMessage =
 export interface GatewayClientOptions {
   baseUrl: string;
   requestId?: string;
+  tlsRejectUnauthorized?: boolean;
   onMessage: (message: NormalizedGatewayMessage) => void;
   onBinary: (data: Buffer) => void;
   onClose: (code: number, reason: Buffer) => void;
@@ -38,7 +39,9 @@ export class GatewayClient {
   constructor(private readonly options: GatewayClientOptions) {}
 
   connect(): void {
-    const socket = new WebSocket(this.buildUrl());
+    const socket = new WebSocket(buildGatewayWsUrl(this.options.baseUrl, this.options.requestId), {
+      rejectUnauthorized: this.options.tlsRejectUnauthorized
+    });
     this.socket = socket;
 
     socket.on('message', (data, isBinary) => {
@@ -82,10 +85,12 @@ export class GatewayClient {
 
     this.socket.send(JSON.stringify(payload));
   }
+}
 
-  private buildUrl(): string {
-    return `${this.options.baseUrl.replace(/\/+$/, '')}/v1/ws/${this.options.requestId ?? ''}`;
-  }
+export function buildGatewayWsUrl(baseUrl: string, requestId: string | undefined): string {
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+  const wsBaseUrl = normalizedBaseUrl.endsWith('/v1/ws') ? normalizedBaseUrl : `${normalizedBaseUrl}/v1/ws`;
+  return `${wsBaseUrl}/${requestId ?? ''}`;
 }
 
 export function normalizeGatewayTextMessage(text: string): NormalizedGatewayMessage {

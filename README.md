@@ -37,7 +37,8 @@ GigaChat auth data is optional. Without it, the app uses local fallback result c
 ## Configuration
 
 - `PORT`: local HTTP port, defaults to `3000`.
-- `GIGACALLER_GATEWAY_WS_URL`: base WebSocket URL for GigaCaller Gateway.
+- `GIGACALLER_GATEWAY_WS_URL`: base WebSocket URL for GigaCaller Gateway. Use the host/base URL, for example `wss://gateway.example.ru`; `/v1/ws` is appended by the app if it is not already present.
+- `GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED`: set to `false` only for local demos against a gateway certificate that is not trusted by your Node.js installation. Prefer installing the corporate CA and leaving this `true`.
 - `DEFAULT_RETRY`: retry string sent to gateway, defaults to `0`.
 - `DEFAULT_VOICE`: default freespeech voice.
 - `GIGACHAT_ACCESS_TOKEN`: optional ready-to-use Bearer token. If set, OAuth is skipped.

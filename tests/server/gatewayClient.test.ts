@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
-import { GatewayClient, normalizeGatewayTextMessage } from '../../src/server/gigacaller/gatewayClient';
+import { GatewayClient, buildGatewayWsUrl, normalizeGatewayTextMessage } from '../../src/server/gigacaller/gatewayClient';
 
 describe('normalizeGatewayTextMessage', () => {
   it('normalizes ready messages', () => {
@@ -74,6 +74,13 @@ describe('normalizeGatewayTextMessage', () => {
 });
 
 describe('GatewayClient', () => {
+  it('builds gateway WebSocket URLs without duplicating v1/ws path', () => {
+    expect(buildGatewayWsUrl('wss://gateway.local', undefined)).toBe('wss://gateway.local/v1/ws/');
+    expect(buildGatewayWsUrl('wss://gateway.local/', 'req-1')).toBe('wss://gateway.local/v1/ws/req-1');
+    expect(buildGatewayWsUrl('wss://gateway.local/v1/ws/', undefined)).toBe('wss://gateway.local/v1/ws/');
+    expect(buildGatewayWsUrl('wss://gateway.local/v1/ws', 'req-1')).toBe('wss://gateway.local/v1/ws/req-1');
+  });
+
   it('sends interrupt payload with fixed calledAt timestamp', () => {
     const send = vi.fn();
     const client = new GatewayClient({
