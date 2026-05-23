@@ -29,6 +29,7 @@ const finishingSessions = new Map<string, Promise<void>>();
 
 export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = async (app, deps) => {
   const gateways = new Map<string, GatewayConnection>();
+  const endCallSessions = new Set<string>();
   const gatewayFactory = deps.gatewayFactory ?? ((options: GatewayClientOptions) => new GatewayClient(options));
 
   app.post('/api/calls', async (request, reply) => {
@@ -75,6 +76,14 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
           return;
         }
         if (terminalStatuses.has(snapshot.status)) {
+          endCallSessions.delete(session.sessionId);
+          void safeFinishSession(session.sessionId, deps);
+          return;
+        }
+
+        if (endCallSessions.has(session.sessionId)) {
+          endCallSessions.delete(session.sessionId);
+          deps.sessions.setStatus(session.sessionId, 'completed');
           void safeFinishSession(session.sessionId, deps);
           return;
         }
@@ -113,6 +122,7 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
             const status = normalizeStatus(message.status);
             deps.sessions.setStatus(session.sessionId, status);
             if (terminalStatuses.has(status)) {
+              endCallSessions.delete(session.sessionId);
               closeGateway(gateways, session.sessionId);
               void safeFinishSession(session.sessionId, deps);
             }
@@ -128,6 +138,9 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
             });
             break;
           case 'functionCall':
+            if (isEndCallFunctionCall(message.data)) {
+              endCallSessions.add(session.sessionId);
+            }
             deps.sessions.addTechnicalEvent(session.sessionId, {
               level: 'info',
               message: 'Function call received',
@@ -141,6 +154,7 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
               details: message.data
             });
             deps.sessions.setStatus(session.sessionId, 'failed');
+            endCallSessions.delete(session.sessionId);
             closeGateway(gateways, session.sessionId);
             void safeFinishSession(session.sessionId, deps);
             break;
@@ -206,6 +220,7 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
 
     gateway.interrupt();
     deps.sessions.setStatus(sessionId, 'interrupted');
+    endCallSessions.delete(sessionId);
     closeGateway(gateways, sessionId);
     void safeFinishSession(sessionId, deps);
 
@@ -245,6 +260,19 @@ function normalizeStatus(status: string | undefined): CallStatus {
   }
 
   return 'published';
+}
+
+function isEndCallFunctionCall(data: unknown): boolean {
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+
+  const functionData = (data as { function?: unknown }).function;
+  if (!functionData || typeof functionData !== 'object') {
+    return false;
+  }
+
+  return (functionData as { name?: unknown }).name === 'end_call';
 }
 
 async function finishSession(sessionId: string, deps: { sessions: SessionStore; config: AppConfig }) {

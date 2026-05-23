@@ -230,6 +230,59 @@ describe('server routes', () => {
     expect(eventText).toContain('"source":"fallback"');
   });
 
+  it('creates a result card when gateway closes after end_call function call', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const createResponse = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '+79990000000',
+        questId: 'prod-down-rpg',
+        voice: 'Bik-Freespeech_8000'
+      }
+    });
+    const { sessionId } = createResponse.json();
+
+    fakeGateway.options.onMessage({
+      type: 'transcription',
+      source: 'user',
+      text: 'Я проверил логи и откатил релиз',
+      seqNum: 1,
+      callId: 'call-1'
+    });
+    fakeGateway.options.onMessage({
+      type: 'functionCall',
+      data: {
+        callId: 'call-1',
+        function: {
+          name: 'end_call'
+        }
+      }
+    });
+    fakeGateway.options.onClose(1000, Buffer.from('end_call'));
+
+    await vi.waitFor(async () => {
+      const sessionResponse = await app.inject({
+        method: 'GET',
+        url: `/api/calls/${sessionId}`
+      });
+      const session = sessionResponse.json();
+
+      expect(session.status).toBe('completed');
+      expect(session.resultCard).toMatchObject({
+        questId: 'prod-down-rpg',
+        source: 'fallback'
+      });
+    });
+
+    await app.close();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('does not create a result card when gateway closes before terminal call status', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
