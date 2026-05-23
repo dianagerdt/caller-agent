@@ -224,11 +224,12 @@ function closeGateway(gateways: Map<string, GatewayConnection>, sessionId: strin
 }
 
 function cleanPhoneNumber(phoneNumber: string): string {
-  return phoneNumber.replace(/\D/g, '');
+  const cleaned = phoneNumber.replace(/[^0-9+]/g, '');
+  return `${cleaned.startsWith('+') ? '+' : ''}${cleaned.replace(/\+/g, '')}`;
 }
 
 function isValidPhoneNumber(phoneNumber: string): boolean {
-  return /^\d{10,15}$/.test(phoneNumber);
+  return /^(\+7|8)\d{10}$/.test(phoneNumber);
 }
 
 function normalizeStatus(status: string | undefined): CallStatus {

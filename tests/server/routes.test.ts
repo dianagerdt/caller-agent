@@ -74,7 +74,7 @@ describe('server routes', () => {
     });
   });
 
-  it('creates session snapshots for valid requests', async () => {
+  it('creates session snapshots for valid requests and preserves gateway phone format', async () => {
     const fakeGateway = createFakeGatewayFactory();
     const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
     const response = await app.inject({
@@ -93,6 +93,42 @@ describe('server routes', () => {
     expect(response.statusCode).toBe(202);
     expect(response.json().questId).toBe('custom');
     expect(fakeGateway.gateway.connect).toHaveBeenCalledOnce();
+
+    fakeGateway.options.onMessage({
+      type: 'ready',
+      requestId: 'request-1'
+    });
+
+    expect(fakeGateway.gateway.sendInitialRequest).toHaveBeenCalledWith(expect.objectContaining({
+      phoneNumber: '+79990000000'
+    }));
+  });
+
+  it('accepts Russian local 8-prefixed phone numbers', async () => {
+    const fakeGateway = createFakeGatewayFactory();
+    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/calls',
+      payload: {
+        phoneNumber: '8 (999) 000-00-00',
+        questId: 'custom',
+        voice: 'Bik-Freespeech_8000',
+        customPrompt: 'Проведи короткий демо-разговор'
+      }
+    });
+
+    fakeGateway.options.onMessage({
+      type: 'ready',
+      requestId: 'request-1'
+    });
+
+    await app.close();
+
+    expect(response.statusCode).toBe(202);
+    expect(fakeGateway.gateway.sendInitialRequest).toHaveBeenCalledWith(expect.objectContaining({
+      phoneNumber: '89990000000'
+    }));
   });
 
   it('creates fallback result card when gateway reports terminal status', async () => {
