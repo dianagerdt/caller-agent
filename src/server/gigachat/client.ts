@@ -19,7 +19,11 @@ export class GigaChatClient {
   constructor(private readonly config: GigaChatConfig) {}
 
   isConfigured(): boolean {
-    return Boolean(this.config.credentials?.trim());
+    return Boolean(
+      this.config.accessToken?.trim() ||
+      this.config.credentials?.trim() ||
+      (this.config.username?.trim() && this.config.password?.trim())
+    );
   }
 
   async completeJson(prompt: string): Promise<unknown> {
@@ -55,9 +59,19 @@ export class GigaChatClient {
   }
 
   private async getAccessToken(): Promise<string> {
-    const credentials = this.config.credentials?.trim();
+    const accessToken = this.config.accessToken?.trim();
+    if (accessToken) {
+      return accessToken;
+    }
+
+    const credentials = this.getBasicCredentials();
     if (!credentials) {
       throw new Error('GigaChat credentials are not configured');
+    }
+
+    const body = new URLSearchParams();
+    if (this.config.scope?.trim()) {
+      body.set('scope', this.config.scope.trim());
     }
 
     const response = await fetch(this.config.authUrl, {
@@ -67,7 +81,7 @@ export class GigaChatClient {
         RqUID: randomUUID(),
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: new URLSearchParams({ scope: this.config.scope }).toString()
+      body: body.toString()
     });
 
     if (!response.ok) {
@@ -80,6 +94,21 @@ export class GigaChatClient {
     }
 
     return payload.access_token;
+  }
+
+  private getBasicCredentials(): string | undefined {
+    const credentials = this.config.credentials?.trim();
+    if (credentials) {
+      return credentials;
+    }
+
+    const username = this.config.username?.trim();
+    const password = this.config.password?.trim();
+    if (!username || !password) {
+      return undefined;
+    }
+
+    return Buffer.from(`${username}:${password}`, 'utf8').toString('base64');
   }
 }
 

@@ -11,7 +11,7 @@ describe('loadConfig', () => {
     expect(config.gigacallerGatewayWsUrl).toBe('ws://gateway:8080');
     expect(config.defaultRetry).toBe('0');
     expect(config.defaultVoice).toBe('Bik-Freespeech_8000');
-    expect(config.gigachat.scope).toBe('GIGACHAT_API_PERS');
+    expect(config.gigachat.scope).toBeUndefined();
   });
 
   it('rejects missing gateway URL', () => {
@@ -63,9 +63,24 @@ describe('loadConfig', () => {
     });
 
     expect(config.gigacallerGatewayWsUrl).toBe('wss://gateway:8080');
-    expect(config.gigachat.scope).toBe('GIGACHAT_API_PERS');
+    expect(config.gigachat.scope).toBeUndefined();
     expect(config.gigachat.authUrl).toBe('https://ngw.devices.sberbank.ru:9443/api/v2/oauth');
     expect(config.gigachat.apiBaseUrl).toBe('https://gigachat.devices.sberbank.ru/api/v1');
     expect(config.gigachat.model).toBe('GigaChat');
+  });
+
+  it('supports direct GigaChat token and login-password auth settings', () => {
+    const config = loadConfig({
+      GIGACALLER_GATEWAY_WS_URL: 'ws://gateway:8080',
+      GIGACHAT_ACCESS_TOKEN: ' direct-token ',
+      GIGACHAT_USERNAME: ' user ',
+      GIGACHAT_PASSWORD: ' pass ',
+      GIGACHAT_SCOPE: ' GIGACHAT_API_CORP '
+    });
+
+    expect(config.gigachat.accessToken).toBe('direct-token');
+    expect(config.gigachat.username).toBe('user');
+    expect(config.gigachat.password).toBe('pass');
+    expect(config.gigachat.scope).toBe('GIGACHAT_API_CORP');
   });
 });

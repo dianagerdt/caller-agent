@@ -6,17 +6,23 @@ export interface AppConfig {
   defaultRetry: string;
   defaultVoice: string;
   gigachat: {
+    accessToken?: string;
     credentials?: string;
-    scope: string;
+    username?: string;
+    password?: string;
+    scope?: string;
     authUrl: string;
     apiBaseUrl: string;
     model: string;
   };
 }
 
+function optionalTrimmedValue(value: string | undefined): string | undefined {
+  return value?.trim() || undefined;
+}
+
 function optionalValue(value: string | undefined, fallback: string): string {
-  const trimmed = value?.trim();
-  return trimmed || fallback;
+  return optionalTrimmedValue(value) || fallback;
 }
 
 function parsePort(value: string | undefined): number {
@@ -63,8 +69,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     defaultRetry: env.DEFAULT_RETRY ?? '0',
     defaultVoice: env.DEFAULT_VOICE ?? 'Bik-Freespeech_8000',
     gigachat: {
-      credentials: env.GIGACHAT_CREDENTIALS?.trim() || undefined,
-      scope: optionalValue(env.GIGACHAT_SCOPE, 'GIGACHAT_API_PERS'),
+      accessToken: optionalTrimmedValue(env.GIGACHAT_ACCESS_TOKEN),
+      credentials: optionalTrimmedValue(env.GIGACHAT_CREDENTIALS),
+      username: optionalTrimmedValue(env.GIGACHAT_USERNAME),
+      password: optionalTrimmedValue(env.GIGACHAT_PASSWORD),
+      scope: optionalTrimmedValue(env.GIGACHAT_SCOPE),
       authUrl: optionalValue(env.GIGACHAT_AUTH_URL, 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'),
       apiBaseUrl: optionalValue(env.GIGACHAT_API_BASE_URL, 'https://gigachat.devices.sberbank.ru/api/v1'),
       model: optionalValue(env.GIGACHAT_MODEL, 'GigaChat')

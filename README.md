@@ -10,7 +10,7 @@ Requirements:
 
 - Node.js 20+
 - running `gigacaller-gateway`
-- optional GigaChat credentials for LLM-generated result cards
+- optional GigaChat auth data for LLM-generated result cards
 
 ```bash
 npm install
@@ -32,7 +32,7 @@ The Vite dev server proxies `/api` to `http://localhost:3000`, so keep `npm run 
 
 Set `GIGACALLER_GATEWAY_WS_URL` to a running `gigacaller-gateway` WebSocket base URL.
 
-GigaChat credentials are optional. Without them, the app uses local fallback result cards.
+GigaChat auth data is optional. Without it, the app uses local fallback result cards.
 
 ## Configuration
 
@@ -40,11 +40,20 @@ GigaChat credentials are optional. Without them, the app uses local fallback res
 - `GIGACALLER_GATEWAY_WS_URL`: base WebSocket URL for GigaCaller Gateway.
 - `DEFAULT_RETRY`: retry string sent to gateway, defaults to `0`.
 - `DEFAULT_VOICE`: default freespeech voice.
-- `GIGACHAT_CREDENTIALS`: optional Basic authorization key for GigaChat.
-- `GIGACHAT_SCOPE`: OAuth scope, defaults to `GIGACHAT_API_PERS`.
+- `GIGACHAT_ACCESS_TOKEN`: optional ready-to-use Bearer token. If set, OAuth is skipped.
+- `GIGACHAT_CREDENTIALS`: optional pre-encoded Basic authorization key for GigaChat OAuth, without the `Basic ` prefix.
+- `GIGACHAT_USERNAME`: optional OAuth login/client id. Used with `GIGACHAT_PASSWORD` when `GIGACHAT_CREDENTIALS` is empty.
+- `GIGACHAT_PASSWORD`: optional OAuth password/client secret. Used with `GIGACHAT_USERNAME`.
+- `GIGACHAT_SCOPE`: optional OAuth scope. Leave blank if your GigaChat access does not require it.
 - `GIGACHAT_AUTH_URL`: GigaChat OAuth URL.
 - `GIGACHAT_API_BASE_URL`: GigaChat REST API base URL.
 - `GIGACHAT_MODEL`: chat completion model, defaults to `GigaChat`.
+
+GigaChat auth priority:
+
+1. `GIGACHAT_ACCESS_TOKEN`
+2. `GIGACHAT_CREDENTIALS`
+3. `GIGACHAT_USERNAME` + `GIGACHAT_PASSWORD`
 
 ## Demo Flow
 
