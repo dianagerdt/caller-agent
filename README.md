@@ -127,7 +127,7 @@ GigaChat необязателен. Если он не настроен или н
 
 ```env
 GIGACHAT_ACCESS_TOKEN=your_token
-GIGACHAT_API_BASE_URL=https://gigachat.devices.sberbank.ru/api/v1
+GIGACHAT_API_BASE_URL=https://mock-gigachat-api.example.test/api/v1
 GIGACHAT_MODEL=GigaChat
 ```
 
@@ -138,8 +138,8 @@ GIGACHAT_MODEL=GigaChat
 ```env
 GIGACHAT_CREDENTIALS=base64_client_credentials
 GIGACHAT_SCOPE=GIGACHAT_API_PERS
-GIGACHAT_AUTH_URL=https://ngw.devices.sberbank.ru:9443/api/v2/oauth
-GIGACHAT_API_BASE_URL=https://gigachat.devices.sberbank.ru/api/v1
+GIGACHAT_AUTH_URL=https://mock-gigachat-auth.example.test/api/v2/oauth
+GIGACHAT_API_BASE_URL=https://mock-gigachat-api.example.test/api/v1
 GIGACHAT_MODEL=GigaChat
 ```
 
@@ -150,8 +150,8 @@ GIGACHAT_MODEL=GigaChat
 ```env
 GIGACHAT_USERNAME=your_login
 GIGACHAT_PASSWORD=your_password
-GIGACHAT_AUTH_URL=https://gigachat.ift.sberdevices.ru/v1/token
-GIGACHAT_API_BASE_URL=https://gigachat.ift.sberdevices.ru/v1
+GIGACHAT_AUTH_URL=https://mock-gigachat-auth.example.test/v1/token
+GIGACHAT_API_BASE_URL=https://mock-gigachat-api.example.test/v1
 GIGACHAT_MODEL=GigaChat-3-Ultra
 ```
 
