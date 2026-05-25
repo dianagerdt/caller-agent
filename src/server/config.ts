@@ -95,8 +95,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       password: optionalTrimmedValue(env.GIGACHAT_PASSWORD),
       scope: optionalTrimmedValue(env.GIGACHAT_SCOPE),
       tlsRejectUnauthorized: parseBoolean(env.GIGACHAT_TLS_REJECT_UNAUTHORIZED, true),
-      authUrl: optionalValue(env.GIGACHAT_AUTH_URL, 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'),
-      apiBaseUrl: optionalValue(env.GIGACHAT_API_BASE_URL, 'https://gigachat.devices.sberbank.ru/api/v1'),
+      authUrl: optionalValue(env.GIGACHAT_AUTH_URL, 'https://mock-gigachat-auth.example.test/api/v2/oauth'),
+      apiBaseUrl: optionalValue(env.GIGACHAT_API_BASE_URL, 'https://mock-gigachat-api.example.test/api/v1'),
       model: optionalValue(env.GIGACHAT_MODEL, 'GigaChat')
     }
   };

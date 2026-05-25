@@ -64,8 +64,8 @@ describe('loadConfig', () => {
 
     expect(config.gigacallerGatewayWsUrl).toBe('wss://gateway:8080');
     expect(config.gigachat.scope).toBeUndefined();
-    expect(config.gigachat.authUrl).toBe('https://ngw.devices.sberbank.ru:9443/api/v2/oauth');
-    expect(config.gigachat.apiBaseUrl).toBe('https://gigachat.devices.sberbank.ru/api/v1');
+    expect(config.gigachat.authUrl).toBe('https://mock-gigachat-auth.example.test/api/v2/oauth');
+    expect(config.gigachat.apiBaseUrl).toBe('https://mock-gigachat-api.example.test/api/v1');
     expect(config.gigachat.model).toBe('GigaChat');
   });
 
