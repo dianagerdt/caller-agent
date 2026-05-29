@@ -326,7 +326,7 @@ export function App() {
               <textarea
                 value={customPrompt}
                 onChange={(event) => setCustomPrompt(event.target.value)}
-                placeholder="Опишите безопасный короткий демо-сценарий"
+                placeholder="Напишите полный системный промпт для звонка"
                 rows={7}
               />
             </label>
@@ -338,8 +338,7 @@ export function App() {
           )}
 
           <p className="warning">
-            Свободный промпт остается демо-сценарием: не просите секреты, коды, документы и не имитируйте реальные
-            организации.
+            Свободный промпт отправляется как есть, без системных добавок. Убедитесь, что он подходит для демо-звонка.
           </p>
 
           {message ? <p className="error-line">{message}</p> : null}

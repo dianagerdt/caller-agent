@@ -57,6 +57,7 @@ export const registerCallRoutes: FastifyPluginAsync<RegisterCallRoutesDeps> = as
     gateway = gatewayFactory({
       baseUrl: deps.config.gigacallerGatewayWsUrl,
       tlsRejectUnauthorized: deps.config.gigacallerGatewayTlsRejectUnauthorized,
+      auth: deps.config.gigacallerGatewayAuth,
       onBinary: () => {
         deps.sessions.addTechnicalEvent(session.sessionId, {
           level: 'info',

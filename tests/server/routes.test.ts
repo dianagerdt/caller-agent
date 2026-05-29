@@ -76,7 +76,16 @@ describe('server routes', () => {
 
   it('creates session snapshots for valid requests and preserves gateway phone format', async () => {
     const fakeGateway = createFakeGatewayFactory();
-    const app = buildApp({ config, gatewayFactory: fakeGateway.factory });
+    const app = buildApp({
+      config: {
+        ...config,
+        gigacallerGatewayAuth: {
+          username: 'demo-user',
+          password: 'demo-password'
+        }
+      },
+      gatewayFactory: fakeGateway.factory
+    });
     const response = await app.inject({
       method: 'POST',
       url: '/api/calls',
@@ -84,7 +93,7 @@ describe('server routes', () => {
         phoneNumber: '+79990000000',
         questId: 'custom',
         voice: 'Bik-Freespeech_8000',
-        customPrompt: 'Проведи короткий демо-разговор'
+        customPrompt: '  Проведи короткий демо-разговор\nбез наших системных добавок  '
       }
     });
 
@@ -93,6 +102,10 @@ describe('server routes', () => {
     expect(response.statusCode).toBe(202);
     expect(response.json().questId).toBe('custom');
     expect(fakeGateway.gateway.connect).toHaveBeenCalledOnce();
+    expect(fakeGateway.options.auth).toEqual({
+      username: 'demo-user',
+      password: 'demo-password'
+    });
 
     fakeGateway.options.onMessage({
       type: 'ready',
@@ -100,7 +113,8 @@ describe('server routes', () => {
     });
 
     expect(fakeGateway.gateway.sendInitialRequest).toHaveBeenCalledWith(expect.objectContaining({
-      phoneNumber: '+79990000000'
+      phoneNumber: '+79990000000',
+      systemPrompt: '  Проведи короткий демо-разговор\nбез наших системных добавок  '
     }));
   });
 

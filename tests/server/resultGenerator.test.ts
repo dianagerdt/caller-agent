@@ -13,7 +13,7 @@ describe('generateResultCard', () => {
     vi.unstubAllGlobals();
   });
 
-  it('uses fallback when credentials are absent', async () => {
+  it('uses fallback when GigaChat API key is absent', async () => {
     const card = await generateResultCard({
       questId: 'custom',
       transcript: [{ id: '1', source: 'user', text: 'Привет', timestamp: 1 }],
@@ -30,7 +30,7 @@ describe('generateResultCard', () => {
     const card = await generateResultCard({
       questId: 'it-archetype',
       transcript: [{ id: '1', source: 'user', text: 'Я люблю backend', timestamp: 1 }],
-      gigachat: { ...baseGigachat, credentials: 'basic-token', authUrl: 'https://auth.local', apiBaseUrl: 'https://api.local' }
+      gigachat: { ...baseGigachat, apiKey: 'authorization-key', authUrl: 'https://auth.local', apiBaseUrl: 'https://api.local' }
     });
 
     expect(card.source).toBe('fallback');
@@ -58,7 +58,7 @@ describe('generateResultCard', () => {
     const card = await generateResultCard({
       questId: 'prod-down-rpg',
       transcript: [{ id: '1', source: 'user', text: 'Проверил логи и откатил релиз', timestamp: 1 }],
-      gigachat: { ...baseGigachat, credentials: 'basic-token', authUrl: 'https://auth.local', apiBaseUrl: 'https://api.local' }
+      gigachat: { ...baseGigachat, apiKey: 'authorization-key', authUrl: 'https://auth.local', apiBaseUrl: 'https://api.local' }
     });
 
     expect(card).toEqual({
@@ -82,34 +82,7 @@ describe('generateResultCard', () => {
     });
   });
 
-  it('uses direct GigaChat access token without OAuth request', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{
-          message: {
-            content: '{"title":"Итог по токену","fields":{"summary":"Готово"}}'
-          }
-        }]
-      })
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const card = await generateResultCard({
-      questId: 'custom',
-      transcript: [{ id: '1', source: 'user', text: 'Проверяем прямой токен', timestamp: 1 }],
-      gigachat: { ...baseGigachat, accessToken: 'direct-token', apiBaseUrl: 'https://api.local' }
-    });
-
-    expect(card.source).toBe('gigachat');
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock.mock.calls[0][0]).toBe('https://api.local/chat/completions');
-    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
-      Authorization: 'Bearer direct-token'
-    });
-  });
-
-  it('uses login and password for OAuth Basic auth without required scope', async () => {
+  it('uses GigaChat API key for OAuth Basic auth', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
@@ -120,7 +93,7 @@ describe('generateResultCard', () => {
         json: async () => ({
           choices: [{
             message: {
-              content: '{"title":"Итог по логину","fields":{"summary":"Готово"}}'
+              content: '{"title":"Итог по API key","fields":{"summary":"Готово"}}'
             }
           }]
         })
@@ -129,11 +102,10 @@ describe('generateResultCard', () => {
 
     const card = await generateResultCard({
       questId: 'custom',
-      transcript: [{ id: '1', source: 'user', text: 'Проверяем логин', timestamp: 1 }],
+      transcript: [{ id: '1', source: 'user', text: 'Проверяем API key', timestamp: 1 }],
       gigachat: {
         ...baseGigachat,
-        username: 'client-id',
-        password: 'client-secret',
+        apiKey: 'authorization-key',
         authUrl: 'https://auth.local',
         apiBaseUrl: 'https://api.local'
       }
@@ -142,22 +114,27 @@ describe('generateResultCard', () => {
     expect(card.source).toBe('gigachat');
     expect(fetchMock.mock.calls[0][0]).toBe('https://auth.local');
     expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
-      Authorization: `Basic ${Buffer.from('client-id:client-secret', 'utf8').toString('base64')}`
+      Authorization: 'Basic authorization-key'
     });
     expect(fetchMock.mock.calls[0][1].body).toBe('');
   });
 
   it('passes a custom TLS dispatcher to GigaChat when verification is disabled', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{
-          message: {
-            content: '{"title":"Итог","fields":{"summary":"Готово"}}'
-          }
-        }]
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: 'access-token' })
       })
-    });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: '{"title":"Итог","fields":{"summary":"Готово"}}'
+            }
+          }]
+        })
+      });
     vi.stubGlobal('fetch', fetchMock);
 
     await generateResultCard({
@@ -165,13 +142,14 @@ describe('generateResultCard', () => {
       transcript: [{ id: '1', source: 'user', text: 'Проверяем TLS', timestamp: 1 }],
       gigachat: {
         ...baseGigachat,
-        accessToken: 'direct-token',
+        apiKey: 'authorization-key',
         apiBaseUrl: 'https://api.local',
         tlsRejectUnauthorized: false
       }
     });
 
     expect(fetchMock.mock.calls[0][1].dispatcher).toBeDefined();
+    expect(fetchMock.mock.calls[1][1].dispatcher).toBeDefined();
   });
 
   it('reports fallback reasons to callers', async () => {
@@ -181,7 +159,7 @@ describe('generateResultCard', () => {
     await generateResultCard({
       questId: 'custom',
       transcript: [{ id: '1', source: 'user', text: 'Проверяем ошибку', timestamp: 1 }],
-      gigachat: { ...baseGigachat, accessToken: 'direct-token', apiBaseUrl: 'https://api.local' },
+      gigachat: { ...baseGigachat, apiKey: 'authorization-key', apiBaseUrl: 'https://api.local' },
       onFallback: (reason) => fallbackReasons.push(reason)
     });
 

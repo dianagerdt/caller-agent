@@ -4,13 +4,14 @@ export interface AppConfig {
   port: number;
   gigacallerGatewayWsUrl: string;
   gigacallerGatewayTlsRejectUnauthorized: boolean;
+  gigacallerGatewayAuth?: {
+    username: string;
+    password: string;
+  };
   defaultRetry: string;
   defaultVoice: string;
   gigachat: {
-    accessToken?: string;
-    credentials?: string;
-    username?: string;
-    password?: string;
+    apiKey?: string;
     scope?: string;
     tlsRejectUnauthorized: boolean;
     authUrl: string;
@@ -59,7 +60,7 @@ function parseGatewayUrl(value: string): string {
   return value.replace(/\/$/, '');
 }
 
-function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+function parseBoolean(value: string | undefined, fallback: boolean, envName: string): boolean {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) {
     return fallback;
@@ -73,7 +74,21 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
     return false;
   }
 
-  throw new Error('GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED must be true or false');
+  throw new Error(`${envName} must be true or false`);
+}
+
+function parseGatewayAuth(env: NodeJS.ProcessEnv): AppConfig['gigacallerGatewayAuth'] {
+  const username = optionalTrimmedValue(env.GIGACALLER_GATEWAY_USERNAME);
+  const password = optionalTrimmedValue(env.GIGACALLER_GATEWAY_PASSWORD);
+  if (!username && !password) {
+    return undefined;
+  }
+
+  if (!username || !password) {
+    throw new Error('GIGACALLER_GATEWAY_USERNAME and GIGACALLER_GATEWAY_PASSWORD must be set together');
+  }
+
+  return { username, password };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -85,18 +100,20 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     port: parsePort(env.PORT),
     gigacallerGatewayWsUrl: parseGatewayUrl(gatewayUrl),
-    gigacallerGatewayTlsRejectUnauthorized: parseBoolean(env.GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED, true),
+    gigacallerGatewayTlsRejectUnauthorized: parseBoolean(
+      env.GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED,
+      true,
+      'GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED'
+    ),
+    gigacallerGatewayAuth: parseGatewayAuth(env),
     defaultRetry: env.DEFAULT_RETRY ?? '0',
     defaultVoice: env.DEFAULT_VOICE ?? 'Bik-Freespeech_8000',
     gigachat: {
-      accessToken: optionalTrimmedValue(env.GIGACHAT_ACCESS_TOKEN),
-      credentials: optionalTrimmedValue(env.GIGACHAT_CREDENTIALS),
-      username: optionalTrimmedValue(env.GIGACHAT_USERNAME),
-      password: optionalTrimmedValue(env.GIGACHAT_PASSWORD),
-      scope: optionalTrimmedValue(env.GIGACHAT_SCOPE),
-      tlsRejectUnauthorized: parseBoolean(env.GIGACHAT_TLS_REJECT_UNAUTHORIZED, true),
-      authUrl: optionalValue(env.GIGACHAT_AUTH_URL, 'https://mock-gigachat-auth.example.test/api/v2/oauth'),
-      apiBaseUrl: optionalValue(env.GIGACHAT_API_BASE_URL, 'https://mock-gigachat-api.example.test/api/v1'),
+      apiKey: optionalTrimmedValue(env.GIGACHAT_API_KEY),
+      scope: optionalTrimmedValue(env.GIGACHAT_SCOPE) ?? 'GIGACHAT_API_PERS',
+      tlsRejectUnauthorized: parseBoolean(env.GIGACHAT_TLS_REJECT_UNAUTHORIZED, true, 'GIGACHAT_TLS_REJECT_UNAUTHORIZED'),
+      authUrl: optionalValue(env.GIGACHAT_AUTH_URL, 'https://ngw.devices.sberbank.ru:9443/api/v2/oauth'),
+      apiBaseUrl: optionalValue(env.GIGACHAT_API_BASE_URL, 'https://gigachat.devices.sberbank.ru/api/v1'),
       model: optionalValue(env.GIGACHAT_MODEL, 'GigaChat')
     }
   };

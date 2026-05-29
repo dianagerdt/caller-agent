@@ -32,7 +32,7 @@ export const QUESTS = Object.freeze([
   Object.freeze({
     id: 'custom',
     title: 'Свободный промпт',
-    description: 'Свой безопасный сценарий для демо-звонка.',
+    description: 'Свой сценарий для демо-звонка без системных добавок.',
     accentColor: '#9bdcff'
   })
 ] satisfies QuestDefinition[]);

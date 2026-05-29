@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
-import { GatewayClient, buildGatewayWsUrl, normalizeGatewayTextMessage } from '../../src/server/gigacaller/gatewayClient';
+import {
+  GatewayClient,
+  buildGatewayAuthorizationHeader,
+  buildGatewayClientOptions,
+  buildGatewayCookieHeader,
+  buildGatewayWsUrl,
+  normalizeGatewayTextMessage,
+  updateGatewayCookieJar
+} from '../../src/server/gigacaller/gatewayClient';
 
 describe('normalizeGatewayTextMessage', () => {
   it('normalizes ready messages', () => {
@@ -74,6 +82,39 @@ describe('normalizeGatewayTextMessage', () => {
 });
 
 describe('GatewayClient', () => {
+  it('builds a Basic Authorization header for gateway login-password auth', () => {
+    expect(buildGatewayAuthorizationHeader({
+      username: 'demo-user',
+      password: 'demo-password'
+    })).toBe('Basic ZGVtby11c2VyOmRlbW8tcGFzc3dvcmQ=');
+  });
+
+  it('follows gateway redirects during WebSocket handshake', () => {
+    expect(buildGatewayClientOptions({
+      username: 'demo-user',
+      password: 'demo-password'
+    }, false)).toMatchObject({
+      rejectUnauthorized: false,
+      followRedirects: true,
+      maxRedirects: 3,
+      headers: {
+        Authorization: 'Basic ZGVtby11c2VyOmRlbW8tcGFzc3dvcmQ='
+      }
+    });
+  });
+
+  it('stores gateway redirect cookies for the next handshake request', () => {
+    const jar = new Map<string, string>();
+
+    updateGatewayCookieJar(jar, [
+      'route=session-a; Path=/; HttpOnly',
+      'csrf=token=value; Secure'
+    ]);
+    updateGatewayCookieJar(jar, 'route=session-b; Path=/; HttpOnly');
+
+    expect(buildGatewayCookieHeader(jar)).toBe('route=session-b; csrf=token=value');
+  });
+
   it('builds gateway WebSocket URLs without duplicating v1/ws path', () => {
     expect(buildGatewayWsUrl('wss://gateway.local', undefined)).toBe('wss://gateway.local/v1/ws/');
     expect(buildGatewayWsUrl('wss://gateway.local/', 'req-1')).toBe('wss://gateway.local/v1/ws/req-1');

@@ -27,6 +27,10 @@ export interface GatewayClientOptions {
   baseUrl: string;
   requestId?: string;
   tlsRejectUnauthorized?: boolean;
+  auth?: {
+    username: string;
+    password: string;
+  };
   onMessage: (message: NormalizedGatewayMessage) => void;
   onBinary: (data: Buffer) => void;
   onClose: (code: number, reason: Buffer) => void;
@@ -39,9 +43,10 @@ export class GatewayClient {
   constructor(private readonly options: GatewayClientOptions) {}
 
   connect(): void {
-    const socket = new WebSocket(buildGatewayWsUrl(this.options.baseUrl, this.options.requestId), {
-      rejectUnauthorized: this.options.tlsRejectUnauthorized
-    });
+    const socket = new WebSocket(
+      buildGatewayWsUrl(this.options.baseUrl, this.options.requestId),
+      buildGatewayClientOptions(this.options.auth, this.options.tlsRejectUnauthorized)
+    );
     this.socket = socket;
 
     socket.on('message', (data, isBinary) => {
@@ -91,6 +96,60 @@ export function buildGatewayWsUrl(baseUrl: string, requestId: string | undefined
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
   const wsBaseUrl = normalizedBaseUrl.endsWith('/v1/ws') ? normalizedBaseUrl : `${normalizedBaseUrl}/v1/ws`;
   return `${wsBaseUrl}/${requestId ?? ''}`;
+}
+
+export function buildGatewayAuthorizationHeader(auth: GatewayClientOptions['auth']): string | undefined {
+  if (!auth) {
+    return undefined;
+  }
+
+  return `Basic ${Buffer.from(`${auth.username}:${auth.password}`, 'utf8').toString('base64')}`;
+}
+
+export function buildGatewayClientOptions(
+  auth: GatewayClientOptions['auth'],
+  tlsRejectUnauthorized: boolean | undefined
+): WebSocket.ClientOptions {
+  const authorizationHeader = buildGatewayAuthorizationHeader(auth);
+  const cookieJar = new Map<string, string>();
+  return {
+    rejectUnauthorized: tlsRejectUnauthorized,
+    followRedirects: true,
+    maxRedirects: 3,
+    headers: authorizationHeader ? { Authorization: authorizationHeader } : undefined,
+    finishRequest: (request) => {
+      const cookieHeader = buildGatewayCookieHeader(cookieJar);
+      if (cookieHeader) {
+        request.setHeader('Cookie', cookieHeader);
+      }
+
+      request.on('response', (response) => {
+        updateGatewayCookieJar(cookieJar, response.headers['set-cookie']);
+      });
+      request.end();
+    }
+  };
+}
+
+export function updateGatewayCookieJar(cookieJar: Map<string, string>, setCookie: string | string[] | undefined): void {
+  const setCookieHeaders = Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [];
+  for (const header of setCookieHeaders) {
+    const [cookiePair] = header.split(';', 1);
+    const separatorIndex = cookiePair.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    cookieJar.set(cookiePair.slice(0, separatorIndex), cookiePair.slice(separatorIndex + 1));
+  }
+}
+
+export function buildGatewayCookieHeader(cookieJar: Map<string, string>): string | undefined {
+  if (cookieJar.size === 0) {
+    return undefined;
+  }
+
+  return Array.from(cookieJar, ([name, value]) => `${name}=${value}`).join('; ');
 }
 
 export function normalizeGatewayTextMessage(text: string): NormalizedGatewayMessage {
