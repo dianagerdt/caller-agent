@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server/index.ts",
+    "dev": "node scripts/dev.cjs",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite --host 0.0.0.0",
     "build": "npm run build:server && npm run build:client",
