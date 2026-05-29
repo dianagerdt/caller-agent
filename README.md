@@ -55,39 +55,9 @@ Copy-Item .env.example .env
 
 Используйте `npm ci`, а не `npm install`: в репе есть `package-lock.json`, поэтому `npm ci` ставит ровно зафиксированные версии зависимостей.
 
-## Быстрый запуск для разработки
-
-```bash
-npm run dev
-```
-
-Команда поднимает два процесса:
-
-- backend API на `http://localhost:3000`;
-- Vite UI на `http://localhost:5173`.
-
-Открывайте UI:
-
-```text
-http://localhost:5173
-```
-
-Если открыть `http://localhost:3000` в dev-режиме, это backend-порт. Для страницы `/` там будет `Route GET:/ not found`, и это не ошибка UI.
-
-## Production-сборка
-
-```bash
-npm run build
-npm start
-```
-
-После production-сборки backend отдает собранный UI сам. В этом режиме открывайте:
-
-```text
-http://localhost:3000
-```
-
 ## Настройка `.env`
+
+Перед сборкой и запуском заполните `.env`, чтобы не запускать приложение без gateway-настроек. Без них UI откроется, но звонки работать не будут.
 
 Минимальная настройка для звонков:
 
@@ -107,6 +77,19 @@ DEFAULT_VOICE=Bik-Freespeech_8000
 
 ```env
 GIGACALLER_GATEWAY_TLS_REJECT_UNAUTHORIZED=false
+```
+
+## Сборка и запуск
+
+```bash
+npm run build
+npm start
+```
+
+Backend отдает собранный UI сам. Открывайте:
+
+```text
+http://localhost:3000
 ```
 
 ## GigaChat
@@ -135,13 +118,15 @@ GIGACHAT_TLS_REJECT_UNAUTHORIZED=false
 
 ## Как провести демо
 
-1. Запустите `npm run dev`.
-2. Откройте `http://localhost:5173`.
-3. Введите номер участника в формате `+7XXXXXXXXXX` или `8XXXXXXXXXX`.
-4. Выберите квест и freespeech-голос.
-5. Нажмите `Старт звонка`.
-6. Следите за live transcript.
-7. После завершения звонка посмотрите карточку справа.
+1. Заполните `.env`.
+2. Запустите `npm run build`.
+3. Запустите `npm start`.
+4. Откройте `http://localhost:3000`.
+5. Введите номер участника в формате `+7XXXXXXXXXX` или `8XXXXXXXXXX`.
+6. Выберите квест и freespeech-голос.
+7. Нажмите `Старт звонка`.
+8. Следите за live transcript.
+9. После завершения звонка посмотрите карточку справа.
 
 ## Доступные голоса
 
@@ -154,9 +139,6 @@ GIGACHAT_TLS_REJECT_UNAUTHORIZED=false
 ## Команды
 
 ```bash
-npm run dev         # backend на 3000 + UI на 5173
-npm run dev:server  # только backend
-npm run dev:client  # только Vite UI
 npm test            # тесты
 npm run build       # production build
 npm start           # запуск production build
@@ -200,7 +182,8 @@ npm ci --no-audit
 После успешного `npm ci --no-audit` делать `npm install` не нужно. Зависимости уже установлены из `package-lock.json`, можно запускать:
 
 ```powershell
-npm run dev
+npm run build
+npm start
 ```
 
 После установки верните проверку TLS:
@@ -211,20 +194,14 @@ npm config set strict-ssl true
 
 ### `Route GET:/ not found` на `localhost:3000`
 
-В dev-режиме `3000` - это backend API, а UI отдает Vite на `5173`.
-
-Открывайте:
-
-```text
-http://localhost:5173
-```
-
-Если нужен один процесс на `3000`, используйте production-сборку:
+Соберите клиент перед запуском backend:
 
 ```powershell
 npm run build
 npm start
 ```
+
+После `npm run build` backend отдает UI на `http://localhost:3000`.
 
 ### `Unsupported engine`
 
